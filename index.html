@@ -2384,23 +2384,42 @@ var P = {};
 var KEY = "kangyo2026-progress";
 var saveTimer = null;
 
+function hasRecord(o){
+  if(!o) return false;
+  for(var k in o){ if(o.hasOwnProperty(k) && k !== "meta") return true; }
+  return false;
+}
+function readLocal(){
+  try{
+    var s = window.localStorage ? localStorage.getItem(KEY) : null;
+    if(s){ var o = JSON.parse(s); if(o && typeof o === "object") P = o; }
+  }catch(e){}
+}
+function writeLocal(){
+  try{ if(window.localStorage) localStorage.setItem(KEY, JSON.stringify(P)); }catch(e){}
+}
 function loadProgress(){
   return new Promise(function(res){
     try{
       if(window.storage && window.storage.get){
         window.storage.get(KEY).then(function(r){
           try{ if(r && r.value) P = JSON.parse(r.value); }catch(e){}
+          if(!hasRecord(P)) readLocal();
           res();
-        })["catch"](function(){ res(); });
+        })["catch"](function(){ readLocal(); res(); });
         return;
       }
     }catch(e){}
+    readLocal();
     res();
   });
 }
 function saveProgress(){
   clearTimeout(saveTimer);
+  var d = new Date();
+  P.meta = { last: ("0"+(d.getMonth()+1)).slice(-2) + "/" + ("0"+d.getDate()).slice(-2) };
   saveTimer = setTimeout(function(){
+    writeLocal();
     try{
       if(window.storage && window.storage.set){
         window.storage.set(KEY, JSON.stringify(P))["catch"](function(){});
@@ -2408,11 +2427,14 @@ function saveProgress(){
     }catch(e){}
   }, 400);
 }
+function lastStudied(){
+  return (P.meta && P.meta.last) ? P.meta.last : "–";
+}
 function wkStat(w){
   var total = w.ox.length + w.mc.length;
   var rec = P["w"+w.n] || {};
   var done = 0, ok = 0;
-  for(var k in rec){ if(rec.hasOwnProperty(k)){ done++; if(rec[k]) ok++; } }
+  for(var k in rec){ if(rec.hasOwnProperty(k) && k.indexOf("p_") !== 0){ done++; if(rec[k]) ok++; } }
   return {total:total, done:done, ok:ok, pct: total ? Math.round(done/total*100) : 0};
 }
 
@@ -2455,6 +2477,7 @@ function renderHome(){
   + "<div class='stat'><div class='k'>収録問題</div><div class='v'>"+totalQ+"<small> 問</small></div></div>"
   + "<div class='stat'><div class='k'>解答済</div><div class='v'>"+totalDone+"<small> 問</small></div></div>"
   + "<div class='stat'><div class='k'>正答率</div><div class='v'>"+(totalDone?rate:"–")+"<small> %</small></div></div>"
+  + "<div class='stat'><div class='k'>最終学習日</div><div class='v' style='font-size:26px'>"+lastStudied()+"</div></div>"
   + "</div></div>"
 
   + "<section><h2>2026年度試験の最重要ポイント</h2>"
